@@ -38,11 +38,11 @@ class BPEProcessor:
         return v_out
     
     def prepare_sequences(self, sequences):
-        """Prepare sequences for BPE by adding spaces between characters."""
+        """Prepare sequences for BPE by treating each sequence as a word in corpus."""
         vocab = Counter()
         for seq in sequences:
-            # Add spaces between each character and add end token
-            spaced_seq = ' '.join(seq) + ' </w>'
+            # Each sequence is a "word" with begin/end markers and spaces between chars
+            spaced_seq = '<s> ' + ' '.join(seq) + ' </s>'
             vocab[spaced_seq] += 1
         return vocab
     
@@ -71,8 +71,8 @@ class BPEProcessor:
     
     def apply_bpe(self, sequence):
         """Apply learned BPE codes to a sequence."""
-        # Start with spaced sequence
-        word = ' '.join(sequence) + ' </w>'
+        # Start with spaced sequence with begin/end markers
+        word = '<s> ' + ' '.join(sequence) + ' </s>'
         
         # Apply each BPE merge in order
         for pair in self.bpe_codes:
