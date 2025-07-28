@@ -89,6 +89,9 @@ Contains the most recent run results with the same file types as above.
 # Basic usage with FASTA input
 python standard_bpe.py -i iData/NEEandREPseq.txt --merges 1000
 
+# Auto-optimize merge count for best efficiency
+python standard_bpe.py -i iData/cbe.fa --auto-optimize --output-tokens output/optimized_tokens.csv
+
 # Full feature usage with all outputs
 python standard_bpe.py -i iData/NEEandREPseq.txt \
   --merges 1000 \
@@ -107,6 +110,18 @@ python bpe_processor.py -i iData/cbe.fa -o output/results.csv --num-merges 1000
 ```bash
 python glove_cooccurrence.py -i output/results.csv -o output/results2 --window-size 5
 ```
+
+## Auto-Optimization Feature
+
+The `standard_bpe.py` script includes an **auto-optimization** feature (`--auto-optimize`) that automatically finds the optimal number of BPE merges by testing different values and maximizing the efficiency score (compression ratio ÷ vocabulary size).
+
+### How Auto-Optimization Works
+1. **Tests multiple merge counts**: 0, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500
+2. **Calculates efficiency score**: compression_ratio ÷ vocabulary_size for each
+3. **Selects optimal**: The merge count with the highest efficiency score
+4. **Balances trade-offs**: Finds the sweet spot between compression and vocabulary size
+
+This is crucial because more merges don't always mean better results - too many merges can create an oversized vocabulary that's expensive to store and process.
 
 ## Alternating Case Token Visualization
 
@@ -198,6 +213,34 @@ python standard_bpe.py -i iData/cbe.fa --merges 1000 \
 - **Tokenization**: Meaningful subword patterns like `TGC`, `ATT`, `AGC`
 
 This demonstrates how BPE performs better with longer, more diverse sequences.
+
+### Auto-Optimized BPE Analysis on cbe.fa
+
+**Input**: `iData/cbe.fa` (314 DNA sequences)
+
+**Command**:
+```bash
+python standard_bpe.py -i iData/cbe.fa --auto-optimize --output-tokens output/optimized_tokens.csv
+```
+
+**Auto-Optimization Process**:
+The algorithm tested merge counts from 0 to 500 and found the optimal efficiency score at **10 merges**.
+
+**Optimized Results Summary**:
+- **Optimal merges (k)**: 10 
+- **Learned vocabulary size**: 12 tokens
+- **Compression ratio**: 1.79x (7005 characters → 3917 tokens)
+- **Efficiency score**: 0.1490 (compression ÷ vocabulary size)
+- **Generated files**: `output/optimized_tokens.csv`, `output/encoded_results.txt`
+
+**Top 5 Most Frequent Tokens**:
+1. `G`: 510 occurrences (13.02%)
+2. `A`: 487 occurrences (12.43%)  
+3. `C`: 484 occurrences (12.36%)
+4. `AA`: 395 occurrences (10.08%)
+5. `T`: 390 occurrences (9.96%)
+
+**Key Insight**: The optimal solution uses only 12 tokens (individual DNA bases + common pairs like AA, CC, GG, TT + markup tokens) rather than 173 unique sequence tokens. This provides a much more efficient vocabulary while maintaining reasonable compression.
 
 ## Applications
 

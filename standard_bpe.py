@@ -216,6 +216,72 @@ def save_token_frequencies(token_freqs, output_file):
     print(f"Token frequencies saved! Found {len(token_freqs)} unique tokens.")
 
 
+def optimize_merge_count(corpus_text, max_merges=100):
+    """Find optimal number of merges based on vocabulary size vs compression trade-off."""
+    print("Optimizing merge count...")
+    print("=" * 60)
+    
+    # Test different merge counts
+    test_points = [0, 5, 10, 15, 20, 30, 50, 75, 100]
+    if max_merges > 100:
+        test_points.extend([150, 200, 300, 500])
+    
+    results = []
+    
+    for merges in test_points:
+        if merges > max_merges:
+            continue
+            
+        print(f"Testing {merges} merges...")
+        
+        # Create temporary BPE instance
+        bpe = StandardBPE(num_merges=merges)
+        bpe.learn_bpe(corpus_text)
+        
+        # Encode and calculate metrics
+        encoded_tokens = bpe.encode_corpus(corpus_text)
+        
+        original_chars = len(corpus_text.replace(' ', ''))
+        encoded_count = len(encoded_tokens)
+        vocab_size = len(bpe.vocab)
+        compression_ratio = original_chars / encoded_count if encoded_count > 0 else 0
+        
+        # Calculate efficiency score (compression per vocabulary token)
+        efficiency = compression_ratio / vocab_size if vocab_size > 0 else 0
+        
+        results.append({
+            'merges': merges,
+            'vocab_size': vocab_size,
+            'compression_ratio': compression_ratio,
+            'efficiency': efficiency,
+            'encoded_tokens': encoded_count
+        })
+        
+        print(f"  Vocab: {vocab_size}, Compression: {compression_ratio:.2f}x, Efficiency: {efficiency:.4f}")
+    
+    # Find optimal based on efficiency score
+    best = max(results, key=lambda x: x['efficiency'])
+    
+    print("\n" + "=" * 60)
+    print("OPTIMIZATION RESULTS:")
+    print("=" * 60)
+    print(f"{'Merges':<8} {'Vocab':<8} {'Compression':<12} {'Efficiency':<12} {'Tokens':<10}")
+    print("-" * 60)
+    
+    for r in results:
+        marker = " <-- OPTIMAL" if r == best else ""
+        print(f"{r['merges']:<8} {r['vocab_size']:<8} {r['compression_ratio']:<12.2f} {r['efficiency']:<12.4f} {r['encoded_tokens']:<10}{marker}")
+    
+    print("=" * 60)
+    print(f"RECOMMENDED: {best['merges']} merges")
+    print(f"  - Vocabulary size: {best['vocab_size']} tokens")
+    print(f"  - Compression ratio: {best['compression_ratio']:.2f}x")
+    print(f"  - Efficiency score: {best['efficiency']:.4f}")
+    print("=" * 60)
+    
+    return best['merges']
+
+
 def main():
     parser = argparse.ArgumentParser(description='Standard BPE processor for DNA sequences')
     
@@ -234,6 +300,8 @@ def main():
     # BPE parameters
     parser.add_argument('--merges', '-m', type=int, default=1000,
                        help='Number of BPE merges to perform (default: 1000)')
+    parser.add_argument('--auto-optimize', action='store_true',
+                       help='Automatically find optimal number of merges (overrides --merges)')
     
     # Display options
     parser.add_argument('--show-vocab', action='store_true',
@@ -257,8 +325,16 @@ def main():
     print(f"Corpus length: {len(corpus_text)} characters")
     print(f"Corpus words: {len(corpus_text.split())} words")
     
+    # Optimize merge count if requested
+    if args.auto_optimize:
+        optimal_merges = optimize_merge_count(corpus_text, max_merges=args.merges)
+        print(f"\nUsing optimized merge count: {optimal_merges}")
+        merges_to_use = optimal_merges
+    else:
+        merges_to_use = args.merges
+    
     # Initialize and train BPE
-    bpe = StandardBPE(num_merges=args.merges)
+    bpe = StandardBPE(num_merges=merges_to_use)
     bpe.learn_bpe(corpus_text)
     
     # Show learned codes if requested
